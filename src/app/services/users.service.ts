@@ -1,44 +1,52 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { AuthenticationResponse } from '../models/authentication-response';
-import { Register } from '../models/register';
+import { Observable, of } from 'rxjs';
 import { environment } from '../../environment';
+import { Claim } from '../models/claim';
+import {
+  MsalService,
+} from '@azure/msal-angular';
 
 @Injectable({
   providedIn: 'root',
 })
 export class UsersService {
-  private baseUrl: string = environment.apiUrl;
+  private usersAPIURL: string = environment.usersAPIURL;
+
   public isAuthenticated: boolean = false;
-  public currentUserName: string | null = "";
+  public claims: Claim[] = [];
+
+  public isAdmin: boolean = false;
+  public adminUserId: string = 'c9839fb6-faea-4413-bf90-49488c14fd43';
+  public currentUserName: string = '';
+  public currentUserId: string = '';
 
   constructor(private http: HttpClient) {
-    // Check local storage for authentication status on application startup
-    this.isAuthenticated = !!localStorage.getItem('authToken');
-    this.currentUserName = localStorage.getItem("currentUserName");
   }
 
-  register(register: Register): Observable<AuthenticationResponse> {
-    return this.http.post<AuthenticationResponse>(`${this.baseUrl}register`, register);
+  getClaim(claimName: string): Claim {
+    return this.claims.find(temp => temp.claim == claimName) as Claim;
   }
 
-  login(email: string, password: string): Observable<AuthenticationResponse> {
-    return this.http.post<AuthenticationResponse>(`${this.baseUrl}login`, { email, password });
+  setClaims(claims: Claim[]) {
+    this.claims = claims;
   }
 
-  setAuthStatus(token: string, currentUserName: string): void {
-    this.isAuthenticated = true;
-    localStorage.setItem('authToken', token);
-    localStorage.setItem('currentUserName', currentUserName);
-    this.currentUserName = currentUserName;
+  setIsAuthenticated(authService: MsalService) {
+    this.isAuthenticated = authService.instance.getAllAccounts().length > 0;
+    var subClaim = this.getClaim('sub');
+
+    if (subClaim && this.isAuthenticated) {
+      this.isAdmin = subClaim.value == this.adminUserId;
+      this.currentUserId = subClaim.value;
+      this.currentUserName = this.getClaim('given_name').value;
+    }
+    console.log(this.claims);
   }
 
-  logout(): void {
-    this.isAuthenticated = false;
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('currentUserName');
+
+  getAuthToken(): any {
+    const token: any = localStorage.getItem('authToken');
+    return token;
   }
 }
-
-//Run: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
